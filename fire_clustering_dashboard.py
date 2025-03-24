@@ -13,6 +13,7 @@ from scipy.cluster.hierarchy import linkage, fcluster
 import hdbscan
 from minisom import MiniSom
 import skfuzzy as fuzz
+from scipy.spatial.distance import cdist
 
 st.set_page_config(page_title="Fire Intensity Clustering Dashboard", layout="wide")
 
@@ -43,6 +44,11 @@ def load_and_clean_data(csv):
     df["log_bright_t31"] = np.log1p(df["bright_t31"])
     df["log_frp"] = np.log1p(df["frp"])
     return df
+
+def predict_nearest_cluster(input_scaled, model_labels, training_scaled_data):
+    dists = cdist(input_scaled, training_scaled_data)
+    nearest_index = np.argmin(dists)
+    return model_labels[nearest_index]
 
 if uploaded_file:
     data = load_and_clean_data(uploaded_file)
@@ -137,11 +143,16 @@ if uploaded_file:
     frp = st.number_input("FRP", value=25.0)
     conf = st.slider("Confidence", 0, 100, 80)
 
-    if st.button("Predict Cluster") and model_option in ["GMM"]:
-        input_scaled = scaler.transform([[np.log1p(b), np.log1p(b31), np.log1p(frp), conf]])
-        cluster_pred = model.predict(input_scaled)[0]
-        st.success(f"Predicted Cluster: {cluster_pred}")
+    if st.button("Predict Cluster"):
+    input_scaled = scaler.transform([[np.log1p(b), np.log1p(b31), np.log1p(frp), conf]])
 
+    if model_option == "GMM":
+        cluster_pred = model.predict(input_scaled)[0]
+    else:
+        cluster_pred = predict_nearest_cluster(input_scaled, labels, scaled_data)
+
+    st.success(f"Predicted Cluster: {cluster_pred}")
+    
     # Comparative Analysis Section
     st.subheader("📊 Comparative Analysis Across Clustering Models")
 
