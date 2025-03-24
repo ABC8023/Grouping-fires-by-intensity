@@ -16,11 +16,10 @@ st.title("🔥 Fire Intensity Clustering Dashboard")
 # Sidebar
 st.sidebar.header("Upload & Configuration")
 uploaded_file = st.sidebar.file_uploader("Upload fire data CSV", type=["csv"])
-model_option = st.sidebar.selectbox("Select Clustering Model", ["GMM", "KMeans (Coming Soon)", "Spectral (Coming Soon)", "HDBSCAN (Coming Soon)"])
+model_option = st.sidebar.selectbox("Select Clustering Model", ["GMM"])  # Can expand later with more models
 
 # Load and preprocess data
 @st.cache_data
-
 def load_and_clean_data(csv):
     df = pd.read_csv(csv)
     df = df[df["type"] != 3]  # remove offshore
@@ -41,7 +40,7 @@ def load_and_clean_data(csv):
 if uploaded_file:
     data = load_and_clean_data(uploaded_file)
     st.subheader("📄 Dataset Preview")
-    st.dataframe(data.head())
+    st.dataframe(data)
 
     # Feature Scaling
     features = ["log_brightness", "log_bright_t31", "log_frp", "confidence"]
@@ -58,25 +57,28 @@ if uploaded_file:
     st.plotly_chart(fig, use_container_width=True)
 
     # Apply GMM
-    if model_option == "GMM":
-        gmm = GaussianMixture(n_components=2, covariance_type="tied", init_params="kmeans", random_state=42)
-        labels = gmm.fit_predict(scaled_data)
-        pca_df["Cluster"] = labels
+    gmm = GaussianMixture(n_components=2, covariance_type="tied", init_params="kmeans", random_state=42)
+    labels = gmm.fit_predict(scaled_data)
+    pca_df["Cluster"] = labels
 
-        st.subheader("🎯 GMM Clustering Results")
-        fig2 = px.scatter(pca_df, x="PC1", y="PC2", color=pca_df["Cluster"].astype(str),
-                          title="GMM Clusters", color_discrete_sequence=px.colors.qualitative.Set2)
-        st.plotly_chart(fig2, use_container_width=True)
+    st.subheader("🎯 GMM Clustering Results")
+    fig2 = px.scatter(pca_df, x="PC1", y="PC2", color=pca_df["Cluster"].astype(str),
+                      title="GMM Clusters", color_discrete_sequence=px.colors.qualitative.Set2)
+    st.plotly_chart(fig2, use_container_width=True)
 
-        # Evaluation metrics
-        silhouette = silhouette_score(scaled_data, labels)
-        db_index = davies_bouldin_score(scaled_data, labels)
-        ch_index = calinski_harabasz_score(scaled_data, labels)
+    # Evaluation metrics
+    silhouette = silhouette_score(scaled_data, labels)
+    db_index = davies_bouldin_score(scaled_data, labels)
+    ch_index = calinski_harabasz_score(scaled_data, labels)
 
-        st.subheader("📊 Clustering Metrics")
-        st.metric("Silhouette Score", f"{silhouette:.3f}")
-        st.metric("Davies-Bouldin Index", f"{db_index:.3f}")
-        st.metric("Calinski-Harabasz Index", f"{ch_index:.0f}")
+    st.subheader("📊 Clustering Metrics")
+    metrics_df = pd.DataFrame({
+        "Model": ["GMM"],
+        "Silhouette Score": [silhouette],
+        "Davies-Bouldin Index": [db_index],
+        "Calinski-Harabasz Index": [ch_index]
+    })
+    st.dataframe(metrics_df)
 
     # Feature importance heatmap
     st.subheader("🔢 Feature Correlation Heatmap")
@@ -85,9 +87,9 @@ if uploaded_file:
     sns.heatmap(corr, annot=True, cmap="coolwarm", ax=ax)
     st.pyplot(fig3)
 
-    # Explore individual feature
-    st.subheader("📈 Feature Distribution")
-    col_to_plot = st.selectbox("Select Feature", ["brightness", "bright_t31", "frp", "confidence"])
+    # Feature exploration
+    st.subheader("📈 Interactive Feature Distribution")
+    col_to_plot = st.selectbox("Select Feature", ["brightness", "bright_t31", "frp", "confidence"], key="feature_select")
     fig4, ax2 = plt.subplots()
     sns.histplot(data[col_to_plot], kde=True, ax=ax2, color="royalblue")
     st.pyplot(fig4)
@@ -99,10 +101,19 @@ if uploaded_file:
     frp = st.number_input("FRP", value=25.0)
     conf = st.slider("Confidence", 0, 100, 80)
 
-    if st.button("Predict Cluster") and model_option == "GMM":
+    if st.button("Predict Cluster"):
         input_scaled = scaler.transform([[np.log1p(b), np.log1p(b31), np.log1p(frp), conf]])
         cluster_pred = gmm.predict(input_scaled)[0]
         st.success(f"Predicted Cluster: {cluster_pred}")
+
+    # Comparative bar chart (more models can be added)
+    st.subheader("📊 Comparative Clustering Metrics")
+    fig_comp = px.bar(
+        metrics_df.melt(id_vars=["Model"], var_name="Metric", value_name="Score"),
+        x="Metric", y="Score", color="Model", barmode="group",
+        title="Comparison of Clustering Metrics"
+    )
+    st.plotly_chart(fig_comp, use_container_width=True)
 
 else:
     st.info("Please upload a fire dataset CSV to get started.")
