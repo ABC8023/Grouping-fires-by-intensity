@@ -8,3 +8,7 @@ matplotlib
 plotly
 scipy
 seaborn
+hdbscan
+scikit-fuzzy
+minisom
+missingno
