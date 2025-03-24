@@ -193,11 +193,66 @@ if uploaded_file:
         metric_df = pd.DataFrame(metric_results).T.round(3)
         st.dataframe(metric_df)
 
+        # 📊 Comparative Analysis Across Clustering Models (Separate Charts)
         st.subheader("📊 Side-by-Side Metric Comparison")
-        metric_melt = metric_df.reset_index().melt(id_vars="index", var_name="Metric", value_name="Score")
-        fig_bar = px.bar(metric_melt, x="index", y="Score", color="Metric", barmode="group",
-                         labels={"index": "Model"}, title="Comparison of Clustering Models")
-        st.plotly_chart(fig_bar, use_container_width=True)
+        
+        metric_results = {
+            "Silhouette": {},        
+            "Davies-Bouldin": {},
+            "Calinski-Harabasz": {}
+        }
+        
+        models_to_compare = {
+            "GMM": GaussianMixture(n_components=2, covariance_type="tied", init_params="kmeans", random_state=42),
+            "Spectral": SpectralClustering(n_clusters=2, affinity='rbf', assign_labels='kmeans', random_state=42),
+            "DBSCAN": DBSCAN(eps=1.0, min_samples=3),
+            "HDBSCAN": hdbscan.HDBSCAN(min_cluster_size=10, min_samples=10),
+            "Fuzzy C-Means": "fcm",
+            "Hierarchical": "hier",
+            "Adaptive Hierarchical": "adapt",
+            "SOM": "som"
+        }
+        
+        for name, model in models_to_compare.items():
+            try:
+                if name == "Fuzzy C-Means":
+                    cntr, u, _, _, _, _, _ = fuzz.cluster.cmeans(
+                        scaled_data.T, 2, m=1.5, error=0.005, maxiter=1000, init=None, seed=42
+                    )
+                    labels = np.argmax(u, axis=0)
+                elif name in ["Hierarchical", "Adaptive Hierarchical"]:
+                    Z = linkage(scaled_data, method="ward")
+                    labels = fcluster(Z, t=2, criterion='maxclust')
+                elif name == "SOM":
+                    som = MiniSom(2, 2, scaled_data.shape[1], sigma=0.5, learning_rate=0.5)
+                    som.random_weights_init(scaled_data)
+                    som.train_random(scaled_data, 200)
+                    nodes = np.array([som.winner(x) for x in scaled_data])
+                    labels = np.array([r * 2 + c for r, c in nodes])
+                else:
+                    labels = model.fit_predict(scaled_data)
+        
+                # Only compute if more than 1 cluster exists
+                if len(set(labels)) > 1:
+                    metric_results["Silhouette"][name] = silhouette_score(scaled_data, labels)
+                    metric_results["Davies-Bouldin"][name] = davies_bouldin_score(scaled_data, labels)
+                    metric_results["Calinski-Harabasz"][name] = calinski_harabasz_score(scaled_data, labels)
+            except Exception as e:
+                st.warning(f"Skipping {name} due to error: {e}")
+        
+        # Plot individual bar charts per metric
+        import plotly.express as px
+        
+        for metric_name, results in metric_results.items():
+            if results:
+                df = pd.DataFrame({
+                    "Model": list(results.keys()),
+                    "Score": list(results.values())
+                })
+        
+                fig = px.bar(df, x="Model", y="Score", title=f"{metric_name} Comparison",
+                             color="Model", text_auto=True)
+                st.plotly_chart(fig, use_container_width=True)
 
 else:
     st.info("Please upload a fire dataset CSV to get started.")
