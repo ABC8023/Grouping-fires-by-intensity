@@ -142,9 +142,6 @@ if uploaded_file:
         cluster_pred = model.predict(input_scaled)[0]
         st.success(f"Predicted Cluster: {cluster_pred}")
 
-else:
-    st.info("Please upload a fire dataset CSV to get started.")
-
     # Comparative Analysis Section
     st.subheader("📊 Comparative Analysis Across Clustering Models")
 
@@ -201,3 +198,6 @@ else:
         fig_bar = px.bar(metric_melt, x="index", y="Score", color="Metric", barmode="group",
                          labels={"index": "Model"}, title="Comparison of Clustering Models")
         st.plotly_chart(fig_bar, use_container_width=True)
+
+else:
+    st.info("Please upload a fire dataset CSV to get started.")
