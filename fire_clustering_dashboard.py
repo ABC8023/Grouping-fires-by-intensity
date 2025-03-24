@@ -144,14 +144,14 @@ if uploaded_file:
     conf = st.slider("Confidence", 0, 100, 80)
 
     if st.button("Predict Cluster"):
-    input_scaled = scaler.transform([[np.log1p(b), np.log1p(b31), np.log1p(frp), conf]])
-
-    if model_option == "GMM":
-        cluster_pred = model.predict(input_scaled)[0]
-    else:
-        cluster_pred = predict_nearest_cluster(input_scaled, labels, scaled_data)
-
-    st.success(f"Predicted Cluster: {cluster_pred}")
+        input_scaled = scaler.transform([[np.log1p(b), np.log1p(b31), np.log1p(frp), conf]])
+    
+        if model_option == "GMM":
+            cluster_pred = model.predict(input_scaled)[0]
+        else:
+            cluster_pred = predict_nearest_cluster(input_scaled, labels, scaled_data)
+    
+        st.success(f"Predicted Cluster: {cluster_pred}")
     
     # Comparative Analysis Section
     st.subheader("📊 Comparative Analysis Across Clustering Models")
