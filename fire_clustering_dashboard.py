@@ -144,3 +144,60 @@ if uploaded_file:
 
 else:
     st.info("Please upload a fire dataset CSV to get started.")
+
+    # Comparative Analysis Section
+    st.subheader("📊 Comparative Analysis Across Clustering Models")
+
+    # Initialize dictionaries
+    metric_results = {}
+    models_to_compare = {
+        "GMM": GaussianMixture(n_components=2, covariance_type="tied", init_params="kmeans", random_state=42),
+        "Spectral": SpectralClustering(n_clusters=2, affinity='rbf', assign_labels='kmeans', random_state=42),
+        "DBSCAN": DBSCAN(eps=1.0, min_samples=3),
+        "HDBSCAN": hdbscan.HDBSCAN(min_cluster_size=10, min_samples=10),
+        "Fuzzy C-Means": "fcm",
+        "Hierarchical": "hier",
+        "Adaptive Hierarchical": "adaptive",
+        "SOM": "som"
+    }
+
+    for model_name, model in models_to_compare.items():
+        try:
+            if model_name == "Fuzzy C-Means":
+                cntr, u, _, _, _, _, _ = fuzz.cluster.cmeans(
+                    scaled_data.T, 2, m=1.5, error=0.005, maxiter=1000, init=None, seed=42
+                )
+                labels = np.argmax(u, axis=0)
+            elif model_name in ["Hierarchical", "Adaptive Hierarchical"]:
+                Z = linkage(scaled_data, method="ward")
+                labels = fcluster(Z, t=2, criterion='maxclust')
+            elif model_name == "SOM":
+                som = MiniSom(2, 2, len(features), sigma=0.5, learning_rate=0.5)
+                som.random_weights_init(scaled_data)
+                som.train_random(scaled_data, 200)
+                winner_nodes = np.array([som.winner(x) for x in scaled_data])
+                labels = np.array([r * 2 + c for r, c in winner_nodes])
+            else:
+                labels = model.fit_predict(scaled_data)
+
+            if len(set(labels)) > 1:
+                sil = silhouette_score(scaled_data, labels)
+                dbi = davies_bouldin_score(scaled_data, labels)
+                chi = calinski_harabasz_score(scaled_data, labels)
+                metric_results[model_name] = {
+                    "Silhouette": sil,
+                    "DB Index": dbi,
+                    "CH Index": chi
+                }
+        except:
+            continue
+
+    if metric_results:
+        metric_df = pd.DataFrame(metric_results).T.round(3)
+        st.dataframe(metric_df)
+
+        st.subheader("📊 Side-by-Side Metric Comparison")
+        metric_melt = metric_df.reset_index().melt(id_vars="index", var_name="Metric", value_name="Score")
+        fig_bar = px.bar(metric_melt, x="index", y="Score", color="Metric", barmode="group",
+                         labels={"index": "Model"}, title="Comparison of Clustering Models")
+        st.plotly_chart(fig_bar, use_container_width=True)
