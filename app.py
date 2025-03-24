@@ -3,113 +3,106 @@ import pandas as pd
 import numpy as np
 import matplotlib.pyplot as plt
 import seaborn as sns
+import plotly.express as px
 from sklearn.decomposition import PCA
-from sklearn.mixture import GaussianMixture
-from sklearn.metrics import silhouette_score, davies_bouldin_score
 from sklearn.preprocessing import StandardScaler
+from sklearn.mixture import GaussianMixture
+from sklearn.metrics import silhouette_score, davies_bouldin_score, calinski_harabasz_score
 
-# Page config
-st.set_page_config(page_title="Fire Intensity Clustering", layout="wide")
+st.set_page_config(page_title="Fire Intensity Clustering Dashboard", layout="wide")
 
-# Load data
+st.title("🔥 Fire Intensity Clustering Dashboard")
+
+# Sidebar
+st.sidebar.header("Upload & Configuration")
+uploaded_file = st.sidebar.file_uploader("Upload fire data CSV", type=["csv"])
+model_option = st.sidebar.selectbox("Select Clustering Model", ["GMM", "KMeans (Coming Soon)", "Spectral (Coming Soon)", "HDBSCAN (Coming Soon)"])
+
+# Load and preprocess data
 @st.cache_data
 
-def load_data(uploaded_file=None):
-    if uploaded_file:
-        return pd.read_csv(uploaded_file)
-    else:
-        return pd.read_csv("fire_scaled.csv")
+def load_and_clean_data(csv):
+    df = pd.read_csv(csv)
+    df = df[df["type"] != 3]  # remove offshore
+    df = df[
+        (df["latitude"].between(-90, 90)) &
+        (df["longitude"].between(-180, 180)) &
+        (df["brightness"] > 200) &
+        (df["bright_t31"] > 200) &
+        (df["frp"] >= 0) &
+        (df["confidence"].between(0, 100))
+    ]
+    df.drop_duplicates(inplace=True)
+    df["log_brightness"] = np.log1p(df["brightness"])
+    df["log_bright_t31"] = np.log1p(df["bright_t31"])
+    df["log_frp"] = np.log1p(df["frp"])
+    return df
 
-st.sidebar.title("🔥 Fire Intensity Clustering Dashboard")
-uploaded_file = st.sidebar.file_uploader("Upload your fire_scaled.csv", type="csv")
-data = load_data(uploaded_file)
-
-# Sidebar Navigation
-page = st.sidebar.selectbox("Select Section", [
-    "Data Overview", "Data Exploration", "PCA Visualization", "Interactive Charts", 
-    "Model Metrics", "Feature Importance", "Clustering Interface", "Comparative Analysis"
-])
-
-# Data Overview
-if page == "Data Overview":
-    st.title("📊 Fire Dataset Overview")
+if uploaded_file:
+    data = load_and_clean_data(uploaded_file)
+    st.subheader("📄 Dataset Preview")
     st.dataframe(data.head())
-    st.write("Shape:", data.shape)
-    st.write("Column Descriptions:")
-    st.json({col: str(dtype) for col, dtype in data.dtypes.items()})
 
-# Data Exploration
-elif page == "Data Exploration":
-    st.title("🔍 Interactive Data Exploration")
-    selected_feature = st.selectbox("Select a feature to explore", data.columns)
-    st.bar_chart(data[selected_feature].value_counts().sort_index())
+    # Feature Scaling
+    features = ["log_brightness", "log_bright_t31", "log_frp", "confidence"]
+    scaler = StandardScaler()
+    scaled_data = scaler.fit_transform(data[features])
 
-# PCA Visualization
-elif page == "PCA Visualization":
-    st.title("🎯 PCA Visualization")
+    # PCA
     pca = PCA(n_components=2)
-    pca_result = pca.fit_transform(data[["log_brightness", "log_bright_t31", "log_frp", "confidence"]])
-    data["PCA1"] = pca_result[:, 0]
-    data["PCA2"] = pca_result[:, 1]
+    reduced = pca.fit_transform(scaled_data)
+    pca_df = pd.DataFrame(reduced, columns=["PC1", "PC2"])
 
-    fig, ax = plt.subplots()
-    sns.scatterplot(data=data, x="PCA1", y="PCA2", hue="gmm_cluster", palette="Set2", ax=ax)
-    st.pyplot(fig)
+    st.subheader("🌐 PCA Visualization")
+    fig = px.scatter(pca_df, x="PC1", y="PC2", title="PCA Projection (Unlabeled)")
+    st.plotly_chart(fig, use_container_width=True)
 
-# Interactive Charts
-elif page == "Interactive Charts":
-    st.title("📊 Interactive Feature Distributions")
-    selected_col = st.selectbox("Choose a feature", ["brightness", "bright_t31", "frp", "confidence"])
-    fig, ax = plt.subplots()
-    sns.histplot(data[selected_col], kde=True, ax=ax)
-    st.pyplot(fig)
+    # Apply GMM
+    if model_option == "GMM":
+        gmm = GaussianMixture(n_components=2, covariance_type="tied", init_params="kmeans", random_state=42)
+        labels = gmm.fit_predict(scaled_data)
+        pca_df["Cluster"] = labels
 
-# Model Metrics
-elif page == "Model Metrics":
-    st.title("📈 Clustering Model Performance")
-    silhouette = silhouette_score(data[["log_brightness", "log_bright_t31", "log_frp", "confidence"]], data["gmm_cluster"])
-    db_score = davies_bouldin_score(data[["log_brightness", "log_bright_t31", "log_frp", "confidence"]], data["gmm_cluster"])
-    st.metric("Silhouette Score", f"{silhouette:.4f}")
-    st.metric("Davies-Bouldin Index", f"{db_score:.4f}")
+        st.subheader("🎯 GMM Clustering Results")
+        fig2 = px.scatter(pca_df, x="PC1", y="PC2", color=pca_df["Cluster"].astype(str),
+                          title="GMM Clusters", color_discrete_sequence=px.colors.qualitative.Set2)
+        st.plotly_chart(fig2, use_container_width=True)
 
-# Feature Importance (Correlation Heatmap)
-elif page == "Feature Importance":
-    st.title("🔥 Feature Correlation Heatmap")
-    features = ["brightness", "bright_t31", "frp", "confidence"]
-    fig, ax = plt.subplots()
-    sns.heatmap(data[features].corr(), annot=True, cmap="coolwarm", ax=ax)
-    st.pyplot(fig)
+        # Evaluation metrics
+        silhouette = silhouette_score(scaled_data, labels)
+        db_index = davies_bouldin_score(scaled_data, labels)
+        ch_index = calinski_harabasz_score(scaled_data, labels)
 
-# Clustering Interface
-elif page == "Clustering Interface":
-    st.title("📥 Predict Cluster for New Input")
-    st.write("Enter values to get cluster prediction:")
-    brightness = st.number_input("Brightness", min_value=0.0, step=0.1)
-    bright_t31 = st.number_input("Bright T31", min_value=0.0, step=0.1)
-    frp = st.number_input("FRP", min_value=0.0, step=0.1)
-    confidence = st.slider("Confidence", 0, 100)
+        st.subheader("📊 Clustering Metrics")
+        st.metric("Silhouette Score", f"{silhouette:.3f}")
+        st.metric("Davies-Bouldin Index", f"{db_index:.3f}")
+        st.metric("Calinski-Harabasz Index", f"{ch_index:.0f}")
 
-    if st.button("Predict Cluster"):
-        input_data = pd.DataFrame({
-            "log_brightness": [np.log1p(brightness)],
-            "log_bright_t31": [np.log1p(bright_t31)],
-            "log_frp": [np.log1p(frp)],
-            "confidence": [confidence]
-        })
-        scaler = StandardScaler()
-        scaled_input = scaler.fit_transform(input_data)
-        model = GaussianMixture(n_components=2, random_state=42).fit(data[["log_brightness", "log_bright_t31", "log_frp", "confidence"]])
-        cluster_pred = model.predict(scaled_input)[0]
-        st.success(f"Predicted GMM Cluster: {cluster_pred}")
+    # Feature importance heatmap
+    st.subheader("🔢 Feature Correlation Heatmap")
+    corr = data[["brightness", "bright_t31", "frp", "confidence"]].corr()
+    fig3, ax = plt.subplots(figsize=(6, 4))
+    sns.heatmap(corr, annot=True, cmap="coolwarm", ax=ax)
+    st.pyplot(fig3)
 
-# Comparative Analysis
-elif page == "Comparative Analysis":
-    st.title("📊 Comparative Clustering Analysis")
-    cluster_cols = [col for col in data.columns if "cluster" in col]
-    cluster_counts = pd.DataFrame({col: data[col].value_counts() for col in cluster_cols}).fillna(0).astype(int)
-    st.dataframe(cluster_counts)
+    # Explore individual feature
+    st.subheader("📈 Feature Distribution")
+    col_to_plot = st.selectbox("Select Feature", ["brightness", "bright_t31", "frp", "confidence"])
+    fig4, ax2 = plt.subplots()
+    sns.histplot(data[col_to_plot], kde=True, ax=ax2, color="royalblue")
+    st.pyplot(fig4)
 
-    fig, ax = plt.subplots(figsize=(10, 5))
-    cluster_counts.plot(kind="bar", ax=ax)
-    plt.title("Cluster Size Comparison Across Models")
-    st.pyplot(fig)
+    # Optional: Predict cluster for user input
+    st.subheader("🔢 Predict Cluster for New Fire Observation")
+    b = st.number_input("Brightness", value=330.0)
+    b31 = st.number_input("Brightness_T31", value=310.0)
+    frp = st.number_input("FRP", value=25.0)
+    conf = st.slider("Confidence", 0, 100, 80)
+
+    if st.button("Predict Cluster") and model_option == "GMM":
+        input_scaled = scaler.transform([[np.log1p(b), np.log1p(b31), np.log1p(frp), conf]])
+        cluster_pred = gmm.predict(input_scaled)[0]
+        st.success(f"Predicted Cluster: {cluster_pred}")
+
+else:
+    st.info("Please upload a fire dataset CSV to get started.")
