@@ -55,17 +55,47 @@ if uploaded_file:
     st.subheader("🔍 Data Exploration")
 
     with st.expander("🧮 Filter Data by Columns"):
-        conf_range = st.slider("Confidence Range", 0, 100, (20, 100))
-        frp_range = st.slider("FRP Range", float(data["frp"].min()), float(data["frp"].max()), (0.0, 100.0))
-        day_night_filter = st.multiselect("Select Day/Night", data["daynight"].unique())
+        filtered_data = data.copy()
     
-    filtered_data = data[
-        (data["confidence"].between(*conf_range)) &
-        (data["frp"].between(*frp_range)) &
-        (data["daynight"].isin(day_night_filter) if day_night_filter else True)
-    ]
+        # Define columns to allow filtering
+        filter_columns = ["latitude", "longitude", "brightness", "confidence", "bright_t31", "frp", "daynight", "type"]
     
-    st.dataframe(filtered_data)
+        for column in filter_columns:
+            if pd.api.types.is_numeric_dtype(data[column]):
+                min_val = float(data[column].min())
+                max_val = float(data[column].max())
+                selected_range = st.slider(
+                    f"{column} range",
+                    min_val, max_val,
+                    (min_val, max_val),
+                    key=f"{column}_filter"
+                )
+                filtered_data = filtered_data[filtered_data[column].between(*selected_range)]
+            
+            elif pd.api.types.is_object_dtype(data[column]) or pd.api.types.is_categorical_dtype(data[column]):
+                options = data[column].dropna().unique().tolist()
+                selected_options = st.multiselect(
+                    f"Select {column}",
+                    options,
+                    default=options,
+                    key=f"{column}_filter"
+                )
+                if selected_options:
+                    filtered_data = filtered_data[filtered_data[column].isin(selected_options)]
+
+    
+    # Format acq_time and remove unwanted columns
+    filtered_data_display = filtered_data.copy()
+    
+    # Convert acq_time like 320 → 03:20:00
+    filtered_data_display["acq_time"] = pd.to_datetime(filtered_data_display["acq_time"].astype(str).str.zfill(4), format="%H%M", errors="coerce").dt.time
+    
+    # Drop log-transformed features from view
+    filtered_data_display = filtered_data_display.drop(columns=["log_brightness", "log_frp"], errors="ignore")
+    
+    st.subheader("🔍 Filtered Data Preview")
+    st.dataframe(filtered_data_display)
+
 
     # Feature Scaling
     features = ["log_brightness", "log_frp"]
