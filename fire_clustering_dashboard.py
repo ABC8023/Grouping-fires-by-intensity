@@ -55,44 +55,17 @@ if uploaded_file:
     st.subheader("🔍 Data Exploration")
 
     with st.expander("🧮 Filter Data by Columns"):
-        filtered_data = data.copy()
+        conf_range = st.slider("Confidence Range", 0, 100, (20, 100))
+        frp_range = st.slider("FRP Range", float(data["frp"].min()), float(data["frp"].max()), (0.0, 100.0))
+        day_night_filter = st.multiselect("Select Day/Night", data["daynight"].unique())
     
-    for column in data.columns:
-        if pd.api.types.is_numeric_dtype(data[column]):
-            col_data = data[column].dropna()
+    filtered_data = data[
+        (data["confidence"].between(*conf_range)) &
+        (data["frp"].between(*frp_range)) &
+        (data["daynight"].isin(day_night_filter) if day_night_filter else True)
+    ]
     
-            if col_data.empty:
-                st.write(f"⚠️ Skipping {column}: no valid numeric data.")
-                continue
-    
-            min_val = float(col_data.min())
-            max_val = float(col_data.max())
-    
-            if min_val == max_val:
-                st.write(f"⚠️ Skipping {column}: only one unique value ({min_val}).")
-                continue
-    
-            try:
-                selected_range = st.slider(
-                    f"{column} Range",
-                    min_val, max_val,
-                    (min_val, max_val),
-                    key=f"{column}_slider"
-                )
-                filtered_data = filtered_data[filtered_data[column].between(*selected_range)]
-            except st.StreamlitAPIException as e:
-                st.warning(f"⚠️ Could not create slider for {column}: {e}")
-                continue
-    
-        elif pd.api.types.is_categorical_dtype(data[column]) or pd.api.types.is_object_dtype(data[column]):
-            unique_vals = data[column].dropna().unique().tolist()
-            selected_vals = st.multiselect(
-                f"Select {column}",
-                unique_vals,
-                default=unique_vals,
-                key=f"{column}_multiselect"
-            )
-            filtered_data = filtered_data[filtered_data[column].isin(selected_vals)]
+    st.dataframe(filtered_data)
 
     st.subheader("🔍 Filtered Data Preview")
     st.dataframe(filtered_data)
