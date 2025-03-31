@@ -196,9 +196,9 @@ if uploaded_file:
 
 
     # Heatmap
-    st.subheader("🔢 Feature Correlation Heatmap")
+    st.subheader("🔢 Feature Correlation Heatmap (Selected Features)")
     fig3, ax = plt.subplots(figsize=(6, 4))
-    sns.heatmap(data[["brightness", "bright_t31", "frp", "confidence"]].corr(), annot=True, cmap="coolwarm", ax=ax)
+    sns.heatmap(data[["brightness", "frp"]].corr(), annot=True, cmap="coolwarm", ax=ax)
     st.pyplot(fig3)
 
 
@@ -214,16 +214,6 @@ if uploaded_file:
     fig4, ax2 = plt.subplots()
     sns.histplot(data[col_to_plot], kde=True, ax=ax2, color="royalblue")
     ax2.set_title(f"Distribution of {col_to_plot}")
-    st.pyplot(fig4)
-
-
-
-
-    # Histogram
-    st.subheader("📈 Interactive Feature Distribution")
-    col_to_plot = st.selectbox("Select Feature", ["brightness", "bright_t31", "frp", "confidence"])
-    fig4, ax2 = plt.subplots()
-    sns.histplot(data[col_to_plot], kde=True, ax=ax2, color="royalblue")
     st.pyplot(fig4)
 
 
