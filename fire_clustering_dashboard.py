@@ -95,7 +95,6 @@ for column in data.columns:
         )
         filtered_data = filtered_data[filtered_data[column].isin(selected_vals)]
 
-
     st.subheader("🔍 Filtered Data Preview")
     st.dataframe(filtered_data)
 
