@@ -41,7 +41,6 @@ def load_and_clean_data(csv):
     ]
     df.drop_duplicates(inplace=True)
     df["log_brightness"] = np.log1p(df["brightness"])
-    df["log_bright_t31"] = np.log1p(df["bright_t31"])
     df["log_frp"] = np.log1p(df["frp"])
     return df
 
@@ -53,10 +52,24 @@ def predict_nearest_cluster(input_scaled, model_labels, training_scaled_data):
 if uploaded_file:
     data = load_and_clean_data(uploaded_file)
     st.subheader("📄 Dataset Preview")
+    st.subheader("🔍 Data Exploration")
+
+    with st.expander("Filter Data"):
+        conf_range = st.slider("Confidence Range", 0, 100, (20, 100))
+        frp_range = st.slider("FRP Range", float(data["frp"].min()), float(data["frp"].max()), (0.0, 100.0))
+        day_night_filter = st.multiselect("Select Day/Night", data["daynight"].unique())
+    
+    filtered_data = data[
+        (data["confidence"].between(*conf_range)) &
+        (data["frp"].between(*frp_range)) &
+        (data["daynight"].isin(day_night_filter) if day_night_filter else True)
+    ]
+    
+    st.dataframe(filtered_data)
     st.dataframe(data)
 
     # Feature Scaling
-    features = ["log_brightness", "log_bright_t31", "log_frp", "confidence"]
+    features = ["log_brightness", "log_frp"]
     scaler = StandardScaler()
     scaled_data = scaler.fit_transform(data[features])
 
@@ -64,6 +77,15 @@ if uploaded_file:
     pca = PCA(n_components=2)
     reduced = pca.fit_transform(scaled_data)
     pca_df = pd.DataFrame(reduced, columns=["PC1", "PC2"])
+
+    st.subheader("📊 PCA Feature Importance (Explained Variance)")
+    explained_var = pca.explained_variance_ratio_
+    st.write(f"PC1 explains {explained_var[0]*100:.2f}% of variance.")
+    st.write(f"PC2 explains {explained_var[1]*100:.2f}% of variance.")
+
+    st.subheader("📊 Cluster Size Distribution")
+    cluster_counts = pd.Series(labels).value_counts().sort_index()
+    st.bar_chart(cluster_counts)
 
     # Run selected model
     if model_option == "GMM":
@@ -123,11 +145,42 @@ if uploaded_file:
     except:
         st.warning("Not enough clusters to compute metrics.")
 
+    # 🔢 Heatmap - All Numerical Features
+    st.subheader("🔢 Feature Correlation Heatmap (All Features)")
+    
+    # Automatically detect numeric columns
+    numeric_columns = data.select_dtypes(include=["int64", "float64"]).columns
+    
+    # Plot heatmap
+    fig3, ax = plt.subplots(figsize=(10, 6))
+    sns.heatmap(data[numeric_columns].corr(), annot=True, cmap="coolwarm", ax=ax)
+    st.pyplot(fig3)
+
+
+
     # Heatmap
     st.subheader("🔢 Feature Correlation Heatmap")
     fig3, ax = plt.subplots(figsize=(6, 4))
     sns.heatmap(data[["brightness", "bright_t31", "frp", "confidence"]].corr(), annot=True, cmap="coolwarm", ax=ax)
     st.pyplot(fig3)
+
+
+
+
+
+    # 📈 Histogram - All Features
+    st.subheader("📈 Interactive Feature Distribution")
+    
+    # Let user choose any numeric column
+    col_to_plot = st.selectbox("Select Feature", numeric_columns)
+    
+    fig4, ax2 = plt.subplots()
+    sns.histplot(data[col_to_plot], kde=True, ax=ax2, color="royalblue")
+    ax2.set_title(f"Distribution of {col_to_plot}")
+    st.pyplot(fig4)
+
+
+
 
     # Histogram
     st.subheader("📈 Interactive Feature Distribution")
@@ -136,23 +189,9 @@ if uploaded_file:
     sns.histplot(data[col_to_plot], kde=True, ax=ax2, color="royalblue")
     st.pyplot(fig4)
 
-    # Predict interface (only for models that support it)
-    st.subheader("🔢 Predict Cluster for New Observation")
-    b = st.number_input("Brightness", value=330.0)
-    b31 = st.number_input("Brightness_T31", value=310.0)
-    frp = st.number_input("FRP", value=25.0)
-    conf = st.slider("Confidence", 0, 100, 80)
 
-    if st.button("Predict Cluster"):
-        input_scaled = scaler.transform([[np.log1p(b), np.log1p(b31), np.log1p(frp), conf]])
-    
-        if model_option == "GMM":
-            cluster_pred = model.predict(input_scaled)[0]
-        else:
-            cluster_pred = predict_nearest_cluster(input_scaled, labels, scaled_data)
-    
-        st.success(f"Predicted Cluster: {cluster_pred}")
-    
+
+
     # Comparative Analysis Section
     st.subheader("📊 Comparative Analysis Across Clustering Models")
 
@@ -264,6 +303,28 @@ if uploaded_file:
                 fig = px.bar(df, x="Model", y="Score", title=f"{metric_name} Comparison",
                              color="Model", text_auto=True)
                 st.plotly_chart(fig, use_container_width=True)
+
+    # Predict interface (only for models that support it)
+    st.subheader("🔢 Predict Cluster for New Observation")
+    b = st.number_input("Brightness", value=330.0)
+    frp = st.number_input("FRP", value=25.0)
+
+    if st.button("Predict Cluster"):
+        input_scaled = scaler.transform([[np.log1p(b), np.log1p(frp)]])
+    
+        if model_option == "Fuzzy C-Means":
+            cluster_pred = model.predict(input_scaled)[0]
+        else:
+            cluster_pred = predict_nearest_cluster(input_scaled, labels, scaled_data)
+    
+        st.success(f"Predicted Cluster: {cluster_pred}")
+
+        # Optional: Add cluster interpretation if you have it
+        cluster_desc = {
+            0: "Low intensity fire zone",
+            1: "High intensity fire zone"
+        }
+        st.info(cluster_desc.get(cluster_pred, "Unknown Cluster"))
 
 else:
     st.info("Please upload a fire dataset CSV to get started.")
