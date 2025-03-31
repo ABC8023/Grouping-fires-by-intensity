@@ -59,7 +59,17 @@ if uploaded_file:
     
         for column in data.columns:
             if pd.api.types.is_numeric_dtype(data[column]):
-                min_val, max_val = float(data[column].min()), float(data[column].max())
+                col_data = data[column].dropna()
+                if col_data.empty:
+                    continue  # Skip empty numeric column
+            
+                min_val, max_val = float(col_data.min()), float(col_data.max())
+                
+                # Avoid crashing when min and max are the same
+                if min_val == max_val:
+                    st.write(f"⚠️ Skipping {column}: only one unique value.")
+                    continue
+            
                 selected_range = st.slider(
                     f"{column} Range",
                     min_val, max_val,
