@@ -57,7 +57,6 @@ if uploaded_file:
     with st.expander("🧮 Filter Data by Columns"):
         filtered_data = data.copy()
     
-        if pd.api.types.is_numeric_dtype(data[column]):
 for column in data.columns:
     if pd.api.types.is_numeric_dtype(data[column]):
         col_data = data[column].dropna()
