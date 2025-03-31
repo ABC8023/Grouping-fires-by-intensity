@@ -112,21 +112,6 @@ if uploaded_file:
     st.write(f"PC1 explains {explained_var[0]*100:.2f}% of variance.")
     st.write(f"PC2 explains {explained_var[1]*100:.2f}% of variance.")
 
-    # Assign cluster labels to PCA dataframe
-    pca_df["Cluster"] = labels
-    
-    # Now it's safe to plot the PCA scatter
-    st.subheader(f"🌐 PCA Visualization - {model_option}")
-    fig = px.scatter(
-        pca_df,
-        x="PC1",
-        y="PC2",
-        color=pca_df["Cluster"].astype(str),
-        title=f"PCA Clusters ({model_option})",
-        color_discrete_sequence=px.colors.qualitative.Set2
-    )
-    st.plotly_chart(fig, use_container_width=True)
-
     # Run selected model
     if model_option == "GMM":
         model = GaussianMixture(n_components=2, covariance_type="tied", init_params="kmeans", random_state=42)
@@ -165,12 +150,19 @@ if uploaded_file:
         winner_nodes = np.array([som.winner(x) for x in scaled_data])
         labels = np.array([r * 2 + c for r, c in winner_nodes])
 
-    # Assign cluster labels to PCA for display
+    # Assign cluster labels to PCA dataframe
     pca_df["Cluster"] = labels
-
+    
+    # Now it's safe to plot the PCA scatter
     st.subheader(f"🌐 PCA Visualization - {model_option}")
-    fig = px.scatter(pca_df, x="PC1", y="PC2", color=pca_df["Cluster"].astype(str),
-                     title=f"PCA Clusters ({model_option})", color_discrete_sequence=px.colors.qualitative.Set2)
+    fig = px.scatter(
+        pca_df,
+        x="PC1",
+        y="PC2",
+        color=pca_df["Cluster"].astype(str),
+        title=f"PCA Clusters ({model_option})",
+        color_discrete_sequence=px.colors.qualitative.Set2
+    )
     st.plotly_chart(fig, use_container_width=True)
 
     # Show cluster size
