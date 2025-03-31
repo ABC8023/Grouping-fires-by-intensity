@@ -226,6 +226,7 @@ st.subheader("📊 Comparative Analysis Across Clustering Models")
 silhouette_scores = {}
 db_scores = {}
 ch_scores = {}
+cluster_distributions = {}
 
 # Define clustering models and their parameters (aligned with .ipynb)
 models_to_compare = {
@@ -274,6 +275,7 @@ for model_name, model in models_to_compare.items():
             silhouette_scores[model_name] = silhouette_score(scaled_data, labels)
             db_scores[model_name] = davies_bouldin_score(scaled_data, labels)
             ch_scores[model_name] = calinski_harabasz_score(scaled_data, labels)
+            cluster_distributions[model_name] = pd.Series(labels).value_counts()
     except Exception as e:
         st.warning(f"Skipping {model_name} due to error: {e}")
 
@@ -285,6 +287,11 @@ metric_df = pd.DataFrame({
     "Calinski-Harabasz Index": ch_scores
 })
 st.dataframe(metric_df.round(3))
+
+# Cluster distribution
+st.subheader("🔢 Cluster Size Distributions")
+distribution_df = pd.DataFrame(cluster_distributions).fillna(0).astype(int)
+st.dataframe(distribution_df)
 
 # Visualize metrics individually
 st.subheader("📊 Side-by-Side Metric Comparison")
