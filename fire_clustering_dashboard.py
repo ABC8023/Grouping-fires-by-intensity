@@ -82,10 +82,6 @@ if uploaded_file:
     st.write(f"PC1 explains {explained_var[0]*100:.2f}% of variance.")
     st.write(f"PC2 explains {explained_var[1]*100:.2f}% of variance.")
 
-    st.subheader("📊 Cluster Size Distribution")
-    cluster_counts = pd.Series(labels).value_counts().sort_index()
-    st.bar_chart(cluster_counts)
-
     # Run selected model
     if model_option == "GMM":
         model = GaussianMixture(n_components=2, covariance_type="tied", init_params="kmeans", random_state=42)
@@ -126,6 +122,11 @@ if uploaded_file:
 
     # Assign cluster labels to PCA for display
     pca_df["Cluster"] = labels
+
+    # Show cluster size
+    st.subheader("📊 Cluster Size Distribution")
+    cluster_counts = pd.Series(labels).value_counts().sort_index()
+    st.bar_chart(cluster_counts)
 
     st.subheader(f"🌐 PCA Visualization - {model_option}")
     fig = px.scatter(pca_df, x="PC1", y="PC2", color=pca_df["Cluster"].astype(str),
