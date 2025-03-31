@@ -66,7 +66,6 @@ if uploaded_file:
     ]
     
     st.dataframe(filtered_data)
-    st.dataframe(data)
 
     # Feature Scaling
     features = ["log_brightness", "log_frp"]
