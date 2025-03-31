@@ -67,9 +67,6 @@ if uploaded_file:
     
     st.dataframe(filtered_data)
 
-    st.subheader("🔍 Filtered Data Preview")
-    st.dataframe(filtered_data)
-
     # Feature Scaling
     features = ["log_brightness", "log_frp"]
     scaler = StandardScaler()
