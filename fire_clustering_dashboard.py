@@ -55,28 +55,28 @@ if uploaded_file:
     st.subheader("🔍 Data Exploration")
 
     with st.expander("🧮 Filter Data by Columns"):
-    filtered_data = data.copy()
-
-    for column in data.columns:
-        if pd.api.types.is_numeric_dtype(data[column]):
-            min_val, max_val = float(data[column].min()), float(data[column].max())
-            selected_range = st.slider(
-                f"{column} Range",
-                min_val, max_val,
-                (min_val, max_val),
-                key=f"{column}_slider"
-            )
-            filtered_data = filtered_data[filtered_data[column].between(*selected_range)]
-
-        elif pd.api.types.is_categorical_dtype(data[column]) or pd.api.types.is_object_dtype(data[column]):
-            unique_vals = data[column].dropna().unique().tolist()
-            selected_vals = st.multiselect(
-                f"Select {column}",
-                unique_vals,
-                default=unique_vals,
-                key=f"{column}_multiselect"
-            )
-            filtered_data = filtered_data[filtered_data[column].isin(selected_vals)]
+        filtered_data = data.copy()
+    
+        for column in data.columns:
+            if pd.api.types.is_numeric_dtype(data[column]):
+                min_val, max_val = float(data[column].min()), float(data[column].max())
+                selected_range = st.slider(
+                    f"{column} Range",
+                    min_val, max_val,
+                    (min_val, max_val),
+                    key=f"{column}_slider"
+                )
+                filtered_data = filtered_data[filtered_data[column].between(*selected_range)]
+    
+            elif pd.api.types.is_categorical_dtype(data[column]) or pd.api.types.is_object_dtype(data[column]):
+                unique_vals = data[column].dropna().unique().tolist()
+                selected_vals = st.multiselect(
+                    f"Select {column}",
+                    unique_vals,
+                    default=unique_vals,
+                    key=f"{column}_multiselect"
+                )
+                filtered_data = filtered_data[filtered_data[column].isin(selected_vals)]
 
     st.subheader("🔍 Filtered Data Preview")
     st.dataframe(filtered_data)
