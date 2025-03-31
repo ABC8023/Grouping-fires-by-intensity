@@ -58,32 +58,43 @@ if uploaded_file:
         filtered_data = data.copy()
     
         if pd.api.types.is_numeric_dtype(data[column]):
-            col_data = data[column].dropna()
-        
-            # Skip if column is empty after dropping NaN
-            if col_data.empty:
-                st.write(f"⚠️ Skipping {column}: no valid numeric data.")
-                continue
-        
-            min_val = float(col_data.min())
-            max_val = float(col_data.max())
-        
-            # Skip if all values are the same
-            if min_val == max_val:
-                st.write(f"⚠️ Skipping {column}: only one unique value ({min_val}).")
-                continue
-        
-            try:
-                selected_range = st.slider(
-                    f"{column} Range",
-                    min_val, max_val,
-                    (min_val, max_val),
-                    key=f"{column}_slider"
-                )
-                filtered_data = filtered_data[filtered_data[column].between(*selected_range)]
-            except st.StreamlitAPIException as e:
-                st.warning(f"⚠️ Could not create slider for {column}: {e}")
-                continue
+for column in data.columns:
+    if pd.api.types.is_numeric_dtype(data[column]):
+        col_data = data[column].dropna()
+
+        if col_data.empty:
+            st.write(f"⚠️ Skipping {column}: no valid numeric data.")
+            continue
+
+        min_val = float(col_data.min())
+        max_val = float(col_data.max())
+
+        if min_val == max_val:
+            st.write(f"⚠️ Skipping {column}: only one unique value ({min_val}).")
+            continue
+
+        try:
+            selected_range = st.slider(
+                f"{column} Range",
+                min_val, max_val,
+                (min_val, max_val),
+                key=f"{column}_slider"
+            )
+            filtered_data = filtered_data[filtered_data[column].between(*selected_range)]
+        except st.StreamlitAPIException as e:
+            st.warning(f"⚠️ Could not create slider for {column}: {e}")
+            continue
+
+    elif pd.api.types.is_categorical_dtype(data[column]) or pd.api.types.is_object_dtype(data[column]):
+        unique_vals = data[column].dropna().unique().tolist()
+        selected_vals = st.multiselect(
+            f"Select {column}",
+            unique_vals,
+            default=unique_vals,
+            key=f"{column}_multiselect"
+        )
+        filtered_data = filtered_data[filtered_data[column].isin(selected_vals)]
+
 
     st.subheader("🔍 Filtered Data Preview")
     st.dataframe(filtered_data)
