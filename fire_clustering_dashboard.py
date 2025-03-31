@@ -54,17 +54,31 @@ if uploaded_file:
     st.subheader("📄 Dataset Preview")
     st.subheader("🔍 Data Exploration")
 
-    with st.expander("Filter Data"):
-        conf_range = st.slider("Confidence Range", 0, 100, (20, 100))
-        frp_range = st.slider("FRP Range", float(data["frp"].min()), float(data["frp"].max()), (0.0, 100.0))
-        day_night_filter = st.multiselect("Select Day/Night", data["daynight"].unique())
-    
-    filtered_data = data[
-        (data["confidence"].between(*conf_range)) &
-        (data["frp"].between(*frp_range)) &
-        (data["daynight"].isin(day_night_filter) if day_night_filter else True)
-    ]
-    
+    with st.expander("🧮 Filter Data by Columns"):
+    filtered_data = data.copy()
+
+    for column in data.columns:
+        if pd.api.types.is_numeric_dtype(data[column]):
+            min_val, max_val = float(data[column].min()), float(data[column].max())
+            selected_range = st.slider(
+                f"{column} Range",
+                min_val, max_val,
+                (min_val, max_val),
+                key=f"{column}_slider"
+            )
+            filtered_data = filtered_data[filtered_data[column].between(*selected_range)]
+
+        elif pd.api.types.is_categorical_dtype(data[column]) or pd.api.types.is_object_dtype(data[column]):
+            unique_vals = data[column].dropna().unique().tolist()
+            selected_vals = st.multiselect(
+                f"Select {column}",
+                unique_vals,
+                default=unique_vals,
+                key=f"{column}_multiselect"
+            )
+            filtered_data = filtered_data[filtered_data[column].isin(selected_vals)]
+
+    st.subheader("🔍 Filtered Data Preview")
     st.dataframe(filtered_data)
 
     # Feature Scaling
@@ -107,7 +121,7 @@ if uploaded_file:
 
     elif model_option == "Hierarchical":
         Z = linkage(scaled_data, method="ward")
-        labels = fcluster(Z, t=2, criterion='maxclust')
+        labels = fcluster(Z, t=3, criterion='maxclust')
 
     elif model_option == "Adaptive Hierarchical":
         Z = linkage(scaled_data, method="ward")
@@ -123,16 +137,16 @@ if uploaded_file:
     # Assign cluster labels to PCA for display
     pca_df["Cluster"] = labels
 
-    # Show cluster size
-    st.subheader("📊 Cluster Size Distribution")
-    cluster_counts = pd.Series(labels).value_counts().sort_index()
-    st.bar_chart(cluster_counts)
-
     st.subheader(f"🌐 PCA Visualization - {model_option}")
     fig = px.scatter(pca_df, x="PC1", y="PC2", color=pca_df["Cluster"].astype(str),
                      title=f"PCA Clusters ({model_option})", color_discrete_sequence=px.colors.qualitative.Set2)
     st.plotly_chart(fig, use_container_width=True)
 
+    # Show cluster size
+    st.subheader("📊 Cluster Size Distribution")
+    cluster_counts = pd.Series(labels).value_counts().sort_index()
+    st.bar_chart(cluster_counts)
+    
     # Compute metrics if possible
     st.subheader("📊 Clustering Metrics")
     try:
