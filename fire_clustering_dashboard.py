@@ -112,6 +112,16 @@ if uploaded_file:
     st.write(f"PC1 explains {explained_var[0]*100:.2f}% of variance.")
     st.write(f"PC2 explains {explained_var[1]*100:.2f}% of variance.")
 
+    fig = px.scatter(
+        pca_df,
+        x="PC1",
+        y="PC2",
+        color=pca_df["Cluster"].astype(str),
+        title=f"PCA Clusters ({model_option})",
+        color_discrete_sequence=px.colors.qualitative.Set2
+    )
+    st.plotly_chart(fig, use_container_width=True)
+
     # Run selected model
     if model_option == "GMM":
         model = GaussianMixture(n_components=2, covariance_type="tied", init_params="kmeans", random_state=42)
