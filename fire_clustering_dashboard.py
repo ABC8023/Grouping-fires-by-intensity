@@ -227,11 +227,11 @@ if uploaded_file:
     models_to_compare = {
         "GMM": GaussianMixture(n_components=2, covariance_type="tied", init_params="kmeans", random_state=42),
         "Spectral": SpectralClustering(n_clusters=2, affinity='rbf', assign_labels='kmeans', random_state=42),
-        "DBSCAN": DBSCAN(eps=1.0, min_samples=3),
-        "HDBSCAN": hdbscan.HDBSCAN(min_cluster_size=10, min_samples=10),
+        "DBSCAN": DBSCAN(eps=0.5, min_samples=3),  # ← Tuned
+        "HDBSCAN": hdbscan.HDBSCAN(min_cluster_size=30, min_samples=5),  # ← Tuned
         "Fuzzy C-Means": "fcm",
-        "Hierarchical": "hier",
-        "Adaptive Hierarchical": "adaptive",
+        "Hierarchical": "hier",  # Keep for dendrogram-based method
+        "Adaptive Hierarchical": "adapt",  # Based on best silhouette k
         "SOM": "som"
     }
 
@@ -242,9 +242,23 @@ if uploaded_file:
                     scaled_data.T, 2, m=1.5, error=0.005, maxiter=1000, init=None, seed=42
                 )
                 labels = np.argmax(u, axis=0)
-            elif model_name in ["Hierarchical", "Adaptive Hierarchical"]:
+            elif model_name == "Hierarchical":
                 Z = linkage(scaled_data, method="ward")
-                labels = fcluster(Z, t=2, criterion='maxclust')
+                labels = fcluster(Z, t=3, criterion='maxclust')  # From dendrogram + elbow
+            
+            elif model_name == "Adaptive Hierarchical":
+                Z = linkage(scaled_data, method="ward")
+                best_sil = -1
+                best_k = 2
+                for k in range(2, 11):
+                    temp_labels = fcluster(Z, t=k, criterion='maxclust')
+                    if len(set(temp_labels)) > 1:
+                        score = silhouette_score(scaled_data, temp_labels)
+                        if score > best_sil:
+                            best_sil = score
+                            best_k = k
+                            labels = temp_labels
+
             elif model_name == "SOM":
                 som = MiniSom(2, 2, len(features), sigma=0.5, learning_rate=0.5)
                 som.random_weights_init(scaled_data)
